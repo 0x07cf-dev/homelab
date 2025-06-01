@@ -1,0 +1,2 @@
+data_dir: "{{ vault_data_dir }}"
+docker_data_dir: "{{ vault_data_dir }}/docker"
