@@ -1,0 +1,13 @@
+---
+exclude_paths:
+  - .ansible/
+  - .devcontainer/
+  - .vagrant/
+  - .venv/
+  - .vscode/
+  - secret/
+skip_list:
+  - name[missing]
+  - no-handler
+
+write_list: [none]
