@@ -1,0 +1,17 @@
+---
+## Vault setup configuration.
+## These variables only matter during the first time running the server.
+#  Print the output in the given format. Valid formats are "table", "json",
+# "yaml", or "pretty". "raw" is allowed for 'vault read' operations only.
+# The default is table.
+vault_init_format: table
+# Number of key shares to split the generated root key into.
+# This is the number of "unseal keys" to generate.
+vault_init_unseal_key_shares: 5
+# Number of key shares required to reconstruct the root key.
+# This must be less than or equal to vault_init_unseal_key_shares.
+vault_init_unseal_key_threshold: 3
+vault_init_command: "vault operator init -n={{ vault_init_unseal_key_shares }} -t={{ vault_init_unseal_key_threshold }} -format {{ vault_init_format }}"
+# Enable this for Vault to write the generated unseal keys and root token
+# from init in the Compose project directory.
+vault_init_write_keys: false

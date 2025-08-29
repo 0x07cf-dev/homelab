@@ -1,0 +1,40 @@
+---
+- ansible.builtin.set_fact:
+    vault_git_repo: git@github.com:0x07cf-dev/docker-compose-vault.git
+    vault_compose_root: "{{ ansible_docker_dir }}/vault"
+
+- name: Fail if Vault address not set
+  ansible.builtin.fail:
+    msg: "Vault address not set. Ensure 'ansible_hashi_vault_url' is set."
+  when: ansible_hashi_vault_url is not defined
+
+- name: Check Vault health
+  ansible.builtin.uri:
+    url: "{{ ansible_hashi_vault_url }}/v1/sys/health"
+    method: GET
+    return_content: true
+    status_code: [200, 429, 472, 473, 501, 503]
+  register: vault_health
+  failed_when: false
+  changed_when: false
+
+- name: Fail if Vault unreachable
+  ansible.builtin.fail:
+    msg: "Vault address set but unreachable."
+  when: vault_health is defined and vault_health.json is not defined
+
+- name: Register Vault seal state
+  ansible.builtin.set_fact:
+    vault_sealed: "{{ vault_health.json.sealed }}"
+  when: vault_health is defined and vault_health.json is defined
+
+- ansible.builtin.debug:
+    msg: "Vault sealed: {{ vault_sealed }}"
+
+- name: Run setup tasks
+  ansible.builtin.include_tasks: setup.yml
+  when: "'vault' in group_names"
+
+- name: Run unseal tasks
+  ansible.builtin.include_tasks: unseal.yml
+  when: vault_sealed | bool

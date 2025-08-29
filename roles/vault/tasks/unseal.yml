@@ -1,0 +1,30 @@
+---
+- name: Ensure unseal keys are provided
+  ansible.builtin.fail:
+    msg: >
+      Vault is sealed, but you did not provide enough unseal keys.
+      You must define 'vault_unseal_keys' as a list of 'vault_init_unseal_key_threshold' (default: 3) unseal keys.
+  when: vault_unseal_keys | length < 1
+
+- name: Unseal Vault via Compose with provided keys
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault operator unseal {{ item }}
+    project_src: "{{ ansible_docker_dir }}/vault"
+  register: vault_unseal_result
+  when: "'vault' in group_names"
+  changed_when: '''"sealed": false'' in vault_unseal_result.results'
+
+- name: Unseal Vault via API with provided keys
+  ansible.builtin.uri:
+    url: "{{ ansible_hashi_vault_url }}/v1/sys/unseal"
+    method: POST
+    body_format: json
+    body:
+      key: "{{ item }}"
+    status_code: 200
+    return_content: true
+  loop: "{{ vault_unseal_keys }}"
+  register: vault_unseal_result
+  when: "'vault' not in group_names"
+  changed_when: '''"sealed": false'' in vault_unseal_result.results'
