@@ -1,4 +1,5 @@
 .ansible
+.vagrant
 .vault
 .venv
 .vscode
