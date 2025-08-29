@@ -1,9 +1,13 @@
 #!/bin/bash
-# Helper script that encrypts or decrypts all found ansible-vault secrets.
+# Helper script that encrypts or decrypts all found secrets.
+# Looks for vault.yml files under *_vars directories.
+set -euo pipefail
+shopt -s globstar nullglob
 
-function show_usage() {
+function print_usage() {
     echo ""
     echo "Usage: $0 [encrypt|decrypt]"
+    echo ""
     echo "Exactly one argument is required:"
     echo " - encrypt    Encrypts all secret files"
     echo " - decrypt    Decrypts all secret files"
@@ -12,12 +16,11 @@ function show_usage() {
 
 if [[ $# -eq 0 ]]; then
     echo "ERROR: mode not specified."
-    show_usage
+    print_usage
 fi
 
 files=(
-    "./group_vars/all/vault.yml"
-    "./group_vars/cloud/vault.yml"
+    ./**/*_vars/**/vault.yml
 )
 
 if [[ $1 == "encrypt" ]]; then
@@ -26,7 +29,6 @@ if [[ $1 == "encrypt" ]]; then
             echo "$file"
         done
     fi
-
 elif [[ $1 == "decrypt" ]]; then
     if ansible-vault decrypt "${files[@]}"; then
         for file in "${files[@]}"; do
@@ -34,6 +36,6 @@ elif [[ $1 == "decrypt" ]]; then
         done
     fi
 else
-    echo "ERROR: Invalid argument: ${1}"
-    show_usage
+    echo "ERROR: invalid argument: ${1}"
+    print_usage
 fi

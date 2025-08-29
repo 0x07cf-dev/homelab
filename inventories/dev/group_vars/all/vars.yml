@@ -1,0 +1,12 @@
+---
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+### Hashicorp Vault.
+# Uses 'approle' auth method by default.
+# If not specified by any other means, the value of the VAULT_ADDR environment variable will be used.
+ansible_hashi_vault_auth_method: approle
+
+ansible_deploy_dir: /opt/deploy
+ansible_docker_dir: /opt/docker
+
+timezone: Europe/Rome

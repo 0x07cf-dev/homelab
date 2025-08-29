@@ -1,0 +1,9 @@
+[vagrant]
+manager-0
+worker-0
+
+[swarm_managers]
+manager-0
+
+[swarm_workers]
+worker-0
