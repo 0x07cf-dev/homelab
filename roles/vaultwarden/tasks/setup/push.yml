@@ -1,0 +1,21 @@
+---
+- name: Ensure push ID is set
+  ansible.builtin.fail:
+    msg: |
+      Mobile client push notifications are enabled, but you did not provide your push ID.
+      Refer to: https://github.com/dani-garcia/vaultwarden/wiki/Enabling-Mobile-Client-push-notification
+  when: vaultwarden_push_id is not defined or not vaultwarden_push_id
+
+- name: Ensure push key is set
+  ansible.builtin.fail:
+    msg: |
+      Mobile client push notifications are enabled, but you did not provide your push key.
+      Refer to: https://github.com/dani-garcia/vaultwarden/wiki/Enabling-Mobile-Client-push-notification
+  when: vaultwarden_push_key is not defined or not vaultwarden_push_key
+
+- name: Ensure data region is set
+  ansible.builtin.fail:
+    msg: |
+      Mobile client push notifications are enabled, but you did not provide your data region.
+      Refer to: https://github.com/dani-garcia/vaultwarden/wiki/Enabling-Mobile-Client-push-notification
+  when: vaultwarden_push_region is not defined or not vaultwarden_push_region
