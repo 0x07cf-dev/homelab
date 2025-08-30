@@ -1,0 +1,29 @@
+---
+- name: Generate admin token if not defined
+  when: not (vaultwarden_admin_token | default(false))
+  block:
+    - ansible.builtin.set_fact:
+        vaultwarden_admin_token: "{{ lookup('ansible.builtin.password', '/dev/null length=64 chars=ascii_letters+digits') }}" # TODO: Use argon2 hashing.
+      no_log: true
+
+    - name: Write admin token to file
+      ansible.builtin.copy:
+        dest: "{{ vaultwarden_compose_root }}/secrets/admin_token"
+        content: "{{ vaultwarden_admin_token }}"
+        mode: "0644"
+      no_log: true
+
+- name: Configure mobile client push notifications
+  ansible.builtin.include_tasks: push.yml
+  when: vaultwarden_enable_push | bool
+
+- name: Copy required Vaultwarden configuration into place
+  ansible.builtin.template:
+    src: "{{ item.src | default(item) }}.j2"
+    dest: "{{ vaultwarden_compose_root }}/{{ item.dest | default(item) }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - .env
+    - secrets/postgres_database
+    - secrets/postgres_user
+    - secrets/postgres_password

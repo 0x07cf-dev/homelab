@@ -1,0 +1,11 @@
+---
+- ansible.builtin.set_fact:
+    vaultwarden_git_repo: git@github.com:0x07cf-dev/docker-compose-vaultwarden.git
+    vaultwarden_compose_root: "{{ ansible_docker_dir }}/vaultwarden"
+  tags:
+    - setup
+
+- name: Run setup tasks
+  ansible.builtin.include_tasks: setup/setup.yml
+  tags:
+    - setup

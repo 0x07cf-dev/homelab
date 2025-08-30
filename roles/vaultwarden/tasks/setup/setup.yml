@@ -1,0 +1,29 @@
+---
+- name: Ensure all Vaultwarden directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ ansible_docker_dir }}"
+    - "{{ vaultwarden_compose_root }}/secrets"
+
+- name: Clone 'docker-compose-vaultwarden' into place
+  ansible.builtin.git:
+    repo: "{{ vaultwarden_git_repo }}"
+    dest: "{{ vaultwarden_compose_root }}"
+    version: main
+    update: false
+    accept_hostkey: true
+  register: vaultwarden_repo
+  changed_when: vaultwarden_repo.after != vaultwarden_repo.before
+  ignore_errors: true
+
+- name: Configure compose stack
+  ansible.builtin.include_tasks: config.yml
+  when: not vaultwarden_repo.failed or vaultwarden_repo.changed
+
+- name: Ensure Vaultwarden compose stack is started
+  community.docker.docker_compose_v2:
+    project_src: "{{ vaultwarden_compose_root }}"
+    state: present
