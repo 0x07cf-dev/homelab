@@ -1,0 +1,53 @@
+---
+- name: Harden SSH configuration
+  ansible.builtin.lineinfile:
+    path: "{{ system_ssh_config_path }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+    mode: "0644"
+    validate: sshd -T -f %s
+  loop:
+    - regexp: "^#?Port"
+      line: "Port {{ system_ssh_port }}"
+    - regexp: "^#?PasswordAuthentication"
+      line: "PasswordAuthentication {{ system_ssh_password_auth | ternary('yes', 'no') }}"
+    - regexp: "^#?PermitRootLogin"
+      line: "PermitRootLogin {{ system_ssh_permit_root_login }}"
+    - regexp: "^#?PermitEmptyPasswords"
+      line: "PermitEmptyPasswords {{ system_ssh_permit_empty_passwords | ternary('yes', 'no') }}"
+    - regexp: "^#?PubkeyAuthentication"
+      line: "PubkeyAuthentication {{ system_ssh_pubkey_auth | ternary('yes', 'no') }}"
+    - regexp: "^#?ChallengeResponseAuthentication"
+      line: "ChallengeResponseAuthentication {{ system_ssh_challenge_response_auth | ternary('yes', 'no') }}"
+    - regexp: "^#?X11Forwarding"
+      line: "X11Forwarding {{ system_ssh_x11_forwarding | ternary('yes', 'no') }}"
+    - regexp: "^#?AllowAgentForwarding"
+      line: "AllowAgentForwarding {{ system_ssh_allow_agent_forwarding | ternary('yes', 'no') }}"
+    - regexp: "^#?ClientAliveInterval"
+      line: "ClientAliveInterval {{ system_ssh_client_alive_interval | default(300) }}"
+    - regexp: "^#?ClientAliveCountMax"
+      line: "ClientAliveCountMax {{ system_ssh_client_alive_count_max | default(2) }}"
+  notify:
+    - Reload systemd
+    - Restart sshd
+
+- name: Configure allowed SSH users and groups
+  ansible.builtin.lineinfile:
+    path: "{{ system_ssh_config_path }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+    mode: "0644"
+    validate: sshd -T -f %s
+  loop:
+    - regexp: "^#?AllowUsers"
+      line: "AllowUsers {{ system_ssh_allowed_users | join(' ') }}"
+      condition: system_ssh_allowed_users | length > 0
+    - regexp: "^#?AllowGroups"
+      line: "AllowGroups {{ system_ssh_allowed_groups | join(' ') }}"
+      condition: system_ssh_allowed_groups | length > 0
+  when: item.condition
+  notify:
+    - Reload systemd
+    - Restart sshd

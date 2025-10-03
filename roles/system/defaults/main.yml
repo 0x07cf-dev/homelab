@@ -1,0 +1,52 @@
+---
+# Users and groups.
+system_users_enabled: "{{ ansible_run_tags | intersect(['users', 'all']) | length > 0 }}"
+system_users: []
+# Example list of users:
+# system_users:
+#   - name: alice
+#     password: hunter2
+#   - name: bob
+#     comment: Bob Smith
+#     shell: /bin/zsh
+#     home: /home/bsmith
+#     groups: docker
+#     password: changeme
+#     state: present
+system_groups: []
+# Example list of groups:
+# system_groups:
+#   - name: staff
+#     gid: 1001
+#   - name: devs
+#   - name: docker
+#     gid: 989
+#     system: true
+
+# SSH Configuration.
+system_ssh_enabled: "{{ ansible_run_tags | intersect(['ssh', 'all']) | length > 0 }}"
+system_ssh_port: 22
+system_ssh_password_auth: false
+system_ssh_permit_root_login: prohibit-password
+system_ssh_permit_empty_passwords: false
+system_ssh_pubkey_auth: true
+system_ssh_challenge_response_auth: false
+system_ssh_x11_forwarding: false
+system_ssh_allow_agent_forwarding: true
+system_ssh_client_alive_interval: 300
+system_ssh_client_alive_count_max: 2
+
+system_ssh_allowed_users: []
+system_ssh_allowed_groups: []
+
+# Unattended upgrades.
+system_unattended_upgrades_enabled: "{{ ansible_run_tags | intersect(['unattended-upgrades', 'all']) | length > 0 }}"
+system_unattended_upgrades_reboot: false
+system_unattended_upgrades_reboot_time: "03:00"
+
+system_unattended_upgrades_origins: []
+system_unattended_upgrades_additional_origins: []
+system_unattended_upgrades_package_blacklist: []
+
+system_unattended_upgrades_mail_to: ""
+system_unattended_upgrades_mail_only_on_error: true

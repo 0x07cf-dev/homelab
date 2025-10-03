@@ -1,0 +1,40 @@
+---
+- name: Ensure all groups exist
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid | default(omit) }}"
+    system: "{{ item.system | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop:
+    - "{{ system_groups }}"
+  when: system_groups | length > 0
+
+- name: Ensure all users exist
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    uid: "{{ item.uid | default(omit) }}"
+    comment: "{{ item.comment | default(omit) }}"
+    groups: "{{ item.groups | default(omit) }}"
+    append: "{{ item.append | default(omit) }}"
+    shell: "{{ item.shell | default(omit) }}"
+    home: "{{ item.home | default(omit) }}"
+    password: "{{ (item.password | password_hash('sha512')) if item.password is defined else omit }}"
+    generate_ssh_key: "{{ item.generate_ssh_key | default(omit) }}"
+    ssh_key_bits: "{{ item.ssh_key_bits if item.generate_ssh_key is defined else omit }}"
+    ssh_key_type: "{{ item.ssh_key_type if item.generate_ssh_key is defined else omit }}"
+    ssh_key_comment: "{{ item.ssh_key_comment if item.generate_ssh_key is defined else item.name ~ '@' ~ inventory_hostname }}"
+    ssh_key_passphrase: "{{ item.ssh_key_passphrase if item.generate_ssh_key is defined else omit }}"
+    ssh_key_file: "{{ item.ssh_key_file | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop:
+    - "{{ system_users }}"
+  when: system_users | length > 0
+
+- name: Ensure authorized SSH keys are added for each user
+  ansible.posix.authorized_key:
+    user: "{{ item.0.name }}"
+    state: present
+    key: "{{ lookup('file', 'files/' + item.1) }}"
+  loop: "{{ system_users | subelements('ssh_keys') }}"
+  when: item.0.ssh_keys is defined and item.0.ssh_keys | length > 0
+  failed_when: false

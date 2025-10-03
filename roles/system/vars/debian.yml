@@ -1,0 +1,6 @@
+---
+system_ssh_config_path: /etc/ssh/sshd_config
+system_sshd_name: ssh
+
+system_unattended_upgrades_origins:
+  - "origin=Debian,codename=${distro_codename},label=Debian-Security"
