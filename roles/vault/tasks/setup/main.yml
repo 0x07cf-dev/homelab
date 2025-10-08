@@ -1,0 +1,45 @@
+---
+- name: Ensure all Vault directories exist
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ vault_compose_root }}/config"
+    - "{{ vault_compose_root }}/secrets"
+
+- name: Clone 'docker-compose-vault' into place
+  ansible.builtin.git:
+    repo: "{{ vault_git_repo }}"
+    dest: "{{ vault_compose_root }}"
+    version: main
+    update: false
+    accept_hostkey: true
+  register: vault_repo
+  changed_when: vault_repo.after != vault_repo.before
+
+- name: Configure compose stack
+  ansible.builtin.include_tasks: config.yml
+  when: not vault_repo.failed or vault_repo.changed
+
+- name: Ensure Vault compose stack is started
+  community.docker.docker_compose_v2:
+    project_src: "{{ vault_compose_root }}"
+    state: present
+  register: vault_compose_state
+
+- name: Check current Vault state via Compose
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault status -format=json
+    project_src: "{{ vault_compose_root }}"
+  register: vault_compose_status
+  when: (vault_compose_state.containers | selectattr('Service', 'equalto', 'vault') | first).State == 'running'
+  changed_when: false
+  failed_when: false
+
+- ansible.builtin.set_fact:
+    vault_sealed: "{{ (vault_compose_status | from_json).sealed | bool }}"
+    vault_initialized: "{{ (vault_compose_status | from_json).initialized | bool }}"
+  when: vault_compose_status is defined

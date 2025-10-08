@@ -1,4 +1,11 @@
 ---
+vault_version: 1.19.5
+vault_setup_enabled: "{{ ansible_run_tags | intersect(['setup', 'all']) | length > 0 }}"
+vault_unseal_enabled: "{{ ansible_run_tags | intersect(['unseal', 'all']) | length > 0 }}"
+
+## Network settings.
+vault_port: 8200
+
 ## Vault setup configuration.
 ## These variables only matter during the first time running the server.
 #  Print the output in the given format. Valid formats are "table", "json",
@@ -11,7 +18,12 @@ vault_init_unseal_key_shares: 5
 # Number of key shares required to reconstruct the root key.
 # This must be less than or equal to vault_init_unseal_key_shares.
 vault_init_unseal_key_threshold: 3
-vault_init_command: "vault operator init -n={{ vault_init_unseal_key_shares }} -t={{ vault_init_unseal_key_threshold }} -format {{ vault_init_format }}"
 # Enable this for Vault to write the generated unseal keys and root token
 # from init in the Compose project directory.
 vault_init_write_keys: false
+vault_init_node_id: "{{ inventory_hostname }}" # Each node in the cluster must have a unique ID.
+
+## Admin credentials.
+## Only used during initial setup to create a privileged entity.
+vault_admin_user: "{{ secret_vault_admin_user | default('vault') }}"
+vault_admin_password: "{{ secret_vault_admin_password | default('vault') }}"

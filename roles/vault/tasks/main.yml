@@ -2,39 +2,74 @@
 - ansible.builtin.set_fact:
     vault_git_repo: git@github.com:0x07cf-dev/docker-compose-vault.git
     vault_compose_root: "{{ ansible_docker_dir }}/vault"
+  when: vault_setup_enabled
+  tags:
+    - setup
+
+- name: Run setup tasks
+  ansible.builtin.include_tasks: setup/main.yml
+  when: vault_setup_enabled
+  tags:
+    - setup
 
 - name: Fail if Vault address not set
   ansible.builtin.fail:
-    msg: "Vault address not set. Ensure 'ansible_hashi_vault_url' is set."
-  when: ansible_hashi_vault_url is not defined
+    msg: "Vault address is not set. Ensure 'ansible_hashi_vault_url' is defined."
+  when: not (ansible_hashi_vault_url | default(false))
 
-- name: Check Vault health
+- name: Check Vault API health
   ansible.builtin.uri:
     url: "{{ ansible_hashi_vault_url }}/v1/sys/health"
     method: GET
     return_content: true
     status_code: [200, 429, 472, 473, 501, 503]
-  register: vault_health
-  failed_when: false
+  register: vault_api_status
   changed_when: false
+  retries: 5
+  until: vault_api_status is succeeded
+  delay: 3
 
-- name: Fail if Vault unreachable
+- name: Fail if Vault API is not responding
   ansible.builtin.fail:
-    msg: "Vault address set but unreachable."
-  when: vault_health is defined and vault_health.json is not defined
+    msg: "Vault is unreachable at {{ ansible_hashi_vault_url }}."
+  when: not (vault_api_status.json | default(false))
 
-- name: Register Vault seal state
-  ansible.builtin.set_fact:
-    vault_sealed: "{{ vault_health.json.sealed }}"
-  when: vault_health is defined and vault_health.json is defined
+- ansible.builtin.set_fact:
+    vault_initialized: "{{ vault_api_status.status | string != '501'
+      or ((vault_compose_status.stdout | from_json).initialized | bool | default(false)) }}"
+  when: vault_initialized is not defined
 
-- ansible.builtin.debug:
-    msg: "Vault sealed: {{ vault_sealed }}"
-
-- name: Run setup tasks
-  ansible.builtin.include_tasks: setup.yml
-  when: "'vault' in group_names"
+- ansible.builtin.set_fact:
+    vault_sealed: "{{ vault_api_status.json.sealed | bool or (vault_api_status.status | string == '503') }}"
+  when: vault_sealed is not defined
 
 - name: Run unseal tasks
   ansible.builtin.include_tasks: unseal.yml
-  when: vault_sealed | bool
+  when:
+    - vault_unseal_enabled
+    - vault_sealed
+  tags:
+    - unseal
+
+# https://developer.hashicorp.com/vault/api-docs/system/health
+- ansible.builtin.set_fact:
+    _vault_http_codes:
+      "200": "initialized, unsealed, and active"
+      "429": "unsealed and standby"
+      "472": "disaster recovery secondary and active"
+      "473": "performance standby"
+      "474": "standby node"
+      "501": "not initialized"
+      "503": "sealed"
+      "530": "removed"
+
+- ansible.builtin.debug:
+    msg: "Vault API state: {{ _vault_http_codes[vault_api_status.status | string] | default('unknown') }}."
+
+- name: Run Vault init tasks
+  ansible.builtin.include_tasks: setup/init.yml
+  when:
+    - vault_setup_enabled
+    - not vault_initialized
+  tags:
+    - setup

@@ -1,0 +1,103 @@
+---
+- name: Initialize Vault
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: "vault operator init -n={{ vault_init_unseal_key_shares }} -t={{ vault_init_unseal_key_threshold }} -format {{ vault_init_format }}"
+    project_src: "{{ vault_compose_root }}"
+  register: vault_init_output
+  changed_when: true
+
+- name: Parse output of vault init
+  ansible.builtin.set_fact:
+    vault_root_token: "{{ (vault_init_output.stdout | from_json).root_token }}"
+    vault_unseal_keys: "{{ (vault_init_output.stdout | from_json).unseal_keys_hex | flatten(levels=1) }}"
+  no_log: true
+
+- name: Write unseal keys to file
+  ansible.builtin.copy:
+    dest: "{{ vault_compose_root }}/keys/vault_unseal_key_{{ index }}"
+    content: "{{ item }}"
+    mode: "0644"
+  loop: "{{ vault_unseal_keys }}"
+  loop_control:
+    index_var: index
+  when: vault_init_write_keys
+
+- name: Write root token to file
+  ansible.builtin.copy:
+    dest: "{{ vault_compose_root }}/keys/vault_root_token"
+    content: "{{ vault_root_token }}"
+    mode: "0644"
+  when: vault_init_write_keys
+
+- name: Create admin group
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault write identity/group name="admins" type="internal" policies="admins"
+    project_src: "{{ vault_compose_root }}"
+
+- name: Copy admin policy into container
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: sh -c "cat > /tmp/admins-policy.hcl"
+    project_src: "{{ vault_compose_root }}"
+  args:
+    stdin: "{{ lookup('file', 'admins-policy.hcl') }}"
+
+- name: Write admin policy inside Vault
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault policy write admins /tmp/admins-policy.hcl
+    project_src: "{{ vault_compose_root }}"
+
+- name: Create admin entity
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault write identity/entity name="{{ vault_admin_user }}" policies="" metadata=owner=me
+    project_src: "{{ vault_compose_root }}"
+
+- name: Register admin entity ID
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault read -field=id identity/entity/name/{{ vault_admin_user }}
+    project_src: "{{ vault_compose_root }}"
+  register: _vault_admin_entity_id
+
+- name: Parse Vault entity IDs
+  ansible.builtin.set_fact:
+    vault_admin_id: "{{ _vault_admin_entity_id.stdout | from_json }}"
+
+- name: Add user to admin group
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault write identity/group/name/admins member_entity_ids={{ vault_admin_id }}
+    project_src: "{{ vault_compose_root }}"
+
+- name: Enable userpass auth
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault auth enable userpass
+    project_src: "{{ vault_compose_root }}"
+
+- name: Create a userpass login
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault write auth/userpass/users/{{ vault_admin_user }} password="{{ vault_admin_password }}"
+    project_src: "{{ vault_compose_root }}"
+
+- name: Register new userpass mount accessor
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault auth list -format=json
+    project_src: "{{ vault_compose_root }}"
+  register: vault_auth_list
+
+- name: Parse new userpass mount accessor
+  ansible.builtin.set_fact:
+    _vault_userpass_accessor: "{{ (vault_auth_list.stdout | from_json)['userpass/'].accessor }}"
+
+- name: Link the userpass login to the admin entity
+  community.docker.docker_compose_v2_exec:
+    service: vault
+    command: vault write identity/entity-alias name="{{ vault_admin_user }}" mount_accessor="{{ _vault_userpass_accessor }}" canonical_id="{{ vault_admin_id }}"
+    project_src: "{{ vault_compose_root }}"

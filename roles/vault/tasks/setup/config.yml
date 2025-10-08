@@ -1,0 +1,23 @@
+---
+- name: Generate admin token if not defined
+  when: not (vault_admin_password | default(false))
+  block:
+    - ansible.builtin.set_fact:
+        vault_admin_password: "{{ lookup('ansible.builtin.password', '/dev/null length=64 chars=ascii_letters+digits') }}" # TODO: Use argon2 hashing.
+      no_log: true
+
+    - name: Write admin password to file
+      ansible.builtin.copy:
+        dest: "{{ vault_compose_root }}/secrets/admin_password"
+        content: "{{ vault_admin_password }}"
+        mode: "0644"
+      no_log: true
+
+- name: Copy required Vault configuration into place
+  ansible.builtin.template:
+    src: "{{ item.src | default(item) }}.j2"
+    dest: "{{ vault_compose_root }}/{{ item.dest | default(item) }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - .env
+    - config/config.hcl
